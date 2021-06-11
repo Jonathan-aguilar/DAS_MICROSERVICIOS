@@ -1,0 +1,131 @@
+version: "3.7"
+services: 
+    # Contenedor A
+    mongo:
+        container_name: mongo_db
+        image: mongo:4.2
+        ports:
+            - 27018:27017
+        restart: always
+        environment:
+            MONGO_INITDB_ROOT_USERNAME: ${MONGO_USERNAME}
+            MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+            MONGO_INITDB_DATABASE: ${MONGO_DB}
+            RABBIT_HOST: rabbitmq
+            RABBIT_PORT: 5672
+            RABBIT_USER: foo
+            RABBIT_PASSWORD: baz123
+            RABBITMQ_SERVER: rabbitmq  
+            AMQPHOST: amqp://guest:guest@rabbitmq:5672
+
+          
+        volumes: 
+            - volumen_mongo:/usr/src/Ordinario
+
+    # Contenedor B
+    mongo-express:
+        container_name: dbms
+        image: mongo-express
+        restart: always
+        ports:
+            - 8082:8081
+        environment:
+            ME_CONFIG_MONGODB_SERVER: ${MONGO_HOSTNAME}
+            ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_USERNAME}
+            ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_PASSWORD}
+            ME_CONFIG_BASICAUTH_USERNAME: ${MONGO_USERNAME}
+            ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO_PASSWORD}
+            
+    #Contenedor C
+    pyhton:
+        container_name: scraperLibros
+        build: ./scrapper
+        restart: on-failure:15
+        ports: 
+            - 5000:5000
+        depends_on: 
+            - mongo
+        volumes: 
+            - volumen_mongo:/usr/src/Ordinario
+        env_file: 
+            - ./scrapper/env.list
+
+    # Contenedor D
+    flask:
+        container_name: pyapp
+        build: ./flask
+        restart: unless-stopped
+        ports:
+          - "5001:5000"
+        volumes:
+          - type: bind
+            source: ./flask
+            target: /usr/src/flask
+        depends_on:
+          - mongo
+        env_file:
+          - ./flask/env.list
+          
+    # Contenedor E
+    worker:
+        build: ./Rabbit
+        restart: on-failure:10
+        container_name: worker1
+        depends_on: 
+            - rabbitmq
+        env_file: 
+            - ./Rabbit/env.list
+
+    worker_2:
+        build: ./Rabbit
+        restart: on-failure:10
+        container_name: worker2
+        depends_on: 
+            - rabbitmq
+        env_file: 
+            - ./Rabbit/env.list
+
+    worker_3:
+        build: ./RabbitUpdate
+        restart: on-failure:10
+        container_name: worker3
+        depends_on: 
+            - rabbitmq
+        env_file: 
+            - ./Rabbit/env.list
+
+    worker_4:
+        build: ./RabbitDelete
+        restart: on-failure:10
+        container_name: worker4
+        depends_on: 
+            - rabbitmq
+        env_file: 
+            - ./Rabbit/env.list
+            
+    rabbitmq:
+        container_name: rabbit
+        image: rabbitmq:3-management
+        hostname: my-rabbit
+        ports: 
+            - 5672:5672
+            - 15672:15672
+        environment: 
+            - RABBITMQ_DEFAULT_USER=foo
+            - RABBITMQ_DEFAULT_PASS=baz123     
+
+    # Contenedor F
+    vue:
+        container_name: vue
+        build: ./vue
+        restart: on-failure:15
+        volumes:
+        - .:/vue
+        ports:
+        - 8079:8080
+        depends_on: 
+        - mongo
+        - pyhton  
+volumes: 
+    volumen_mongo:
+    
